@@ -39,6 +39,7 @@ public:
     sharding_policy_t                           sharding_policy; // the default sharding policy
     std::unordered_map<std::string,uint32_t>    object_locations; // the list of shards where a corresponding key is stored.
     bool                                        deleted; // is deleted
+    std::unordered_map<std::string,std::string> afsets; // the affinity set for a corresponding key
 
     // serialization support
     DEFAULT_SERIALIZATION_SUPPORT(ObjectPoolMetadata<CascadeTypes...>,
@@ -51,7 +52,8 @@ public:
                                   subgroup_index,
                                   sharding_policy,
                                   object_locations,
-                                  deleted);
+                                  deleted,
+                                  afsets);
 
     // constructor 0: default
     ObjectPoolMetadata():
@@ -64,7 +66,8 @@ public:
         subgroup_index(0),
         sharding_policy(HASH),
         object_locations(),
-        deleted(false) {}
+        deleted(false),
+        afsets() {}
 
     // constructor 1:
     ObjectPoolMetadata(const persistent::version_t _version,
@@ -76,7 +79,8 @@ public:
                        uint32_t _subgroup_index,
                        sharding_policy_t _sharding_policy,
                        const std::unordered_map<std::string,uint32_t>& _object_locations,
-                       bool _deleted):
+                       bool _deleted,
+                       const std::unordered_map<std::string,std::string>& _afsets):
         version(_version),
         timestamp_us(_timestamp_us),
         previous_version(_previous_version),
@@ -86,7 +90,8 @@ public:
         subgroup_index(_subgroup_index),
         sharding_policy(_sharding_policy),
         object_locations(_object_locations),
-        deleted(_deleted) {
+        deleted(_deleted),
+        afsets(_afsets) {
             if (!check_pathname_format(_pathname)) {
                 throw derecho::derecho_exception("Invalid object pool pathname:" + _pathname);
             }
@@ -97,7 +102,8 @@ public:
                        uint32_t _subgroup_index,
                        sharding_policy_t _sharding_policy,
                        const std::unordered_map<std::string,uint32_t>& _object_locations,
-                       bool _deleted):
+                       bool _deleted,
+                       const std::unordered_map<std::string,std::string>& _afsets):
         version(persistent::INVALID_VERSION),
         timestamp_us(0),
         previous_version(persistent::INVALID_VERSION),
@@ -107,7 +113,8 @@ public:
         subgroup_index(_subgroup_index),
         sharding_policy(_sharding_policy),
         object_locations(_object_locations),
-        deleted(_deleted) {
+        deleted(_deleted),
+        afsets(_afsets) {
             if (!check_pathname_format(_pathname)) {
                 throw derecho::derecho_exception("Invalid object pool pathname:" + _pathname);
             }
@@ -124,7 +131,8 @@ public:
         subgroup_index(other.subgroup_index),
         sharding_policy(other.sharding_policy),
         object_locations(other.object_locations),
-        deleted(other.deleted) {}
+        deleted(other.deleted),
+        afsets(other.afsets) {}
 
     // constructor 3: move constructor
     ObjectPoolMetadata(ObjectPoolMetadata&& other):
@@ -137,7 +145,8 @@ public:
         subgroup_index(other.subgroup_index),
         sharding_policy(other.sharding_policy),
         object_locations(std::move(other.object_locations)),
-        deleted(other.deleted) {}
+        deleted(other.deleted),
+        afsets(std::move(other.afsets)) {}
 
     void operator = (const ObjectPoolMetadata& other) {
         this->version = other.version;
@@ -150,6 +159,7 @@ public:
         this->sharding_policy = other.sharding_policy;
         this->object_locations = other.object_locations;
         this->deleted = other.deleted;
+        this->afsets = other.afsets;
     }
 
     virtual const std::string& get_key_ref() const override {
@@ -232,6 +242,13 @@ public:
             uint32_t shard_index = 0;
             switch (sharding_policy) {
             case HASH:
+                if constexpr (std::is_convertible_v<KeyType,std::string>){
+                    if (afsets.find(key) != afsets.end()){
+                        shard_index = std::hash<std::string>{}(afsets.at(key)) % num_shards;
+                        break;
+                    }
+                }
+
                 shard_index = std::hash<std::string>{}(key) % num_shards;
                 break;
             default:
@@ -284,7 +301,8 @@ ObjectPoolMetadata<CascadeTypes...> ObjectPoolMetadata<CascadeTypes...>::IV(
         0,                           // subgroup_index
         HASH,                        // HASH
         {},                          // object_locations
-        false);                      // deleted
+        false,                       // deleted
+        {});                         // afsets
 
 template<typename... CascadeTypes>
 const std::vector<std::type_index> ObjectPoolMetadata<CascadeTypes...>::subgroup_type_order{std::type_index(typeid(CascadeTypes))...};

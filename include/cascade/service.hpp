@@ -1136,7 +1136,7 @@ namespace cascade {
         template <typename SubgroupType>
         derecho::rpc::QueryResults<std::tuple<persistent::version_t,uint64_t>> create_object_pool(
                 const std::string& pathname, const uint32_t subgroup_index,
-                const sharding_policy_t sharding_policy = HASH, const std::unordered_map<std::string,uint32_t>& object_locations = {});
+                const sharding_policy_t sharding_policy = HASH, const std::unordered_map<std::string,uint32_t>& object_locations = {}, const std::unordered_map<std::string,std::string>& afsets = {});
 
         /**
          * ObjectPoolManagement API: remote object pool
