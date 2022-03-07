@@ -41,11 +41,11 @@ int main(int argc, char** argv) {
         std::string afset = std::to_string(i % NUM_AFSETS);
 
         // without afsets
-        uint32_t shard = opm1.key_to_shard_index(key,NUM_SHARDS,false);
+        uint32_t shard = opm1.key_to_shard_index(key,NUM_SHARDS);
         shard_count1[shard]++;
 
         // with afsets
-        shard = opm2.key_to_shard_index(key,NUM_SHARDS,false);
+        shard = opm2.key_to_shard_index(key,NUM_SHARDS);
         shard_count2[shard]++;
         if(expected_shard.find(afset) == expected_shard.end())
             expected_shard[afset] = shard;
