@@ -23,3 +23,11 @@ target_include_directories(object_pool_metadata PRIVATE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 )
 target_link_libraries(object_pool_metadata cascade)
+
+add_executable(affinity_sets affinity_sets.cpp)
+target_include_directories(affinity_sets PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+)
+target_link_libraries(affinity_sets cascade)
