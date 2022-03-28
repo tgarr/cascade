@@ -351,6 +351,14 @@ namespace cascade {
             std::string,
             ObjectPoolMetadata<CascadeTypes...>> object_pool_metadata_cache;
         mutable std::shared_mutex object_pool_metadata_cache_mutex;
+
+        /**
+         * 'affinity_set_logic' is a user defined function that maps a given 
+         * object key to an affinity set. Objects in the same affinity set are
+         * stored in the same shard. If no function is defined, the default
+         * sharding policy is employed. 
+         */
+        std::function<const std::string(const std::string &)> affinity_set_logic = nullptr;
     
         /**
          * Pick a member by a given a policy.
@@ -448,6 +456,13 @@ namespace cascade {
         template <typename SubgroupType>
         std::tuple<ShardMemberSelectionPolicy,node_id_t> get_member_selection_policy(
                 uint32_t subgroup_index, uint32_t shard_index) const;
+
+        /**
+         * "set_affinity_set_logic" updates the affinity set logic function.
+         *
+         * @param function          user defined function that maps an object key (string) to an affinity set (string)
+         */
+        void set_affinity_set_logic(const std::function<const std::string(const std::string &)> function);
     
         /**
          * "put" writes an object to a given subgroup/shard.

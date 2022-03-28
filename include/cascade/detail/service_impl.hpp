@@ -268,6 +268,11 @@ std::tuple<ShardMemberSelectionPolicy,node_id_t> ServiceClient<CascadeTypes...>:
 }
 
 template <typename... CascadeTypes>
+void ServiceClient<CascadeTypes...>::set_affinity_set_logic(const std::function<const std::string(const std::string &)> function){
+    this->affinity_set_logic = function;
+}
+
+template <typename... CascadeTypes>
 template <typename SubgroupType>
 void ServiceClient<CascadeTypes...>::refresh_member_cache_entry(uint32_t subgroup_index,
                                                           uint32_t shard_index) {
@@ -299,7 +304,7 @@ std::tuple<uint32_t,uint32_t,uint32_t> ServiceClient<CascadeTypes...>::key_to_sh
         throw derecho::derecho_exception("Failed to find object_pool:" + object_pool_pathname);
     }
     return std::tuple<uint32_t,uint32_t,uint32_t>{opm.subgroup_type_index,opm.subgroup_index,
-        opm.key_to_shard_index(key,get_number_of_shards(opm.subgroup_type_index,opm.subgroup_index),check_object_location)};
+        opm.key_to_shard_index(key,get_number_of_shards(opm.subgroup_type_index,opm.subgroup_index),check_object_location,affinity_set_logic)};
 }
 
 /**
