@@ -472,6 +472,7 @@ bool VolatileCascadeStore<KT,VT,IK,IV>::internal_ordered_put(const VT& value) {
             // group->template get_subgroup<VolatileCascadeStore>(this->subgroup_index).get_subgroup_id(), // this is subgroup id
             this->subgroup_index, // this is subgroup index
             group->template get_subgroup<VolatileCascadeStore>(this->subgroup_index).get_shard_num(),
+            group->get_rpc_caller_id(),
             value.get_key_ref(), value, cascade_context_ptr);
     }
 
@@ -533,6 +534,7 @@ std::tuple<persistent::version_t,uint64_t> VolatileCascadeStore<KT,VT,IK,IV>::or
             // group->template get_subgroup<VolatileCascadeStore>(this->subgroup_index).get_subgroup_id(), // this is subgroup id
             this->subgroup_index,
             group->template get_subgroup<VolatileCascadeStore>(this->subgroup_index).get_shard_num(),
+            group->get_rpc_caller_id(),
             key, value,cascade_context_ptr);
     }
 
@@ -574,6 +576,7 @@ void VolatileCascadeStore<KT,VT,IK,IV>::trigger_put(const VT& value) const {
         (*cascade_watcher_ptr)(
             this->subgroup_index, 
             group->template get_subgroup<VolatileCascadeStore<KT,VT,IK,IV>>(this->subgroup_index).get_shard_num(),
+            group->get_rpc_caller_id(),
             value.get_key_ref(), value, cascade_context_ptr, true);
     }
 
@@ -1393,6 +1396,7 @@ bool PersistentCascadeStore<KT,VT,IK,IV,ST>::internal_ordered_put(const VT& valu
             // group->template get_subgroup<PersistentCascadeStore>(this->subgroup_index).get_subgroup_id(), // this is subgroup id
             this->subgroup_index,
             group->template get_subgroup<PersistentCascadeStore>(this->subgroup_index).get_shard_num(),
+            group->get_rpc_caller_id(),
             value.get_key_ref(), value, cascade_context_ptr);
     }
     return true;
@@ -1415,6 +1419,7 @@ std::tuple<persistent::version_t,uint64_t> PersistentCascadeStore<KT,VT,IK,IV,ST
                 // group->template get_subgroup<PersistentCascadeStore>(this->subgroup_index).get_subgroup_id(), // this is subgroup id
                 this->subgroup_index,
                 group->template get_subgroup<PersistentCascadeStore>(this->subgroup_index).get_shard_num(),
+                group->get_rpc_caller_id(),
                 key, value, cascade_context_ptr);
         }
     }
@@ -1450,6 +1455,7 @@ void PersistentCascadeStore<KT,VT,IK,IV,ST>::trigger_put(const VT& value) const 
         (*cascade_watcher_ptr)(
             this->subgroup_index, 
             group->template get_subgroup<PersistentCascadeStore<KT,VT,IK,IV,ST>>(this->subgroup_index).get_shard_num(),
+            group->get_rpc_caller_id(),
             value.get_key_ref(), value, cascade_context_ptr, true);
     }
 
@@ -1532,6 +1538,18 @@ PersistentCascadeStore<KT,VT,IK,IV,ST>::PersistentCascadeStore(
                                                persistent_core(std::move(_persistent_core)),
                                                cascade_watcher_ptr(cw),
                                                cascade_context_ptr(cc) {
+}
+
+template<typename KT, typename VT, KT* IK, VT* IV, persistent::StorageType ST>
+PersistentCascadeStore<KT,VT,IK,IV,ST>::PersistentCascadeStore():
+                                               persistent_core(
+                                                   [](){
+                                                       return std::make_unique<DeltaCascadeStoreCore<KT,VT,IK,IV>>();
+                                                   },
+                                                   nullptr,
+                                                   nullptr),
+                                               cascade_watcher_ptr(nullptr),
+                                               cascade_context_ptr(nullptr) {
 }
 
 template<typename KT, typename VT, KT* IK, VT* IV, persistent::StorageType ST>
@@ -1662,6 +1680,7 @@ void TriggerCascadeNoStore<KT,VT,IK,IV>::trigger_put(const VT& value) const {
         (*cascade_watcher_ptr)(
             this->subgroup_index, 
             group->template get_subgroup<TriggerCascadeNoStore<KT,VT,IK,IV>>(this->subgroup_index).get_shard_num(),
+            group->get_rpc_caller_id(),
             value.get_key_ref(), value, cascade_context_ptr, true);
     }
 
@@ -1718,7 +1737,6 @@ TriggerCascadeNoStore<KT,VT,IK,IV>::TriggerCascadeNoStore(CriticalDataPathObserv
                                             ICascadeContext* cc):
                                             cascade_watcher_ptr(cw),
                                             cascade_context_ptr(cc) {}
-
 
 }//namespace cascade
 }//namespace derecho
