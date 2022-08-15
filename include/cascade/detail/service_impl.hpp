@@ -8,6 +8,7 @@
 #include <derecho/core/derecho.hpp>
 #include <cascade/data_flow_graph.hpp>
 #include <chrono>
+#include <iostream>
 
 using namespace std::chrono_literals;
 
@@ -15,6 +16,17 @@ using namespace std::chrono_literals;
 #include <sys/syscall.h>
 #define gettid() syscall(SYS_gettid)
 #endif
+
+
+static std::chrono::high_resolution_clock::time_point print_time(auto
+&key,std::chrono::high_resolution_clock::time_point &start,const char *tag){
+    if(key.find("/category/data/") == 0){
+        auto elapsed = std::chrono::high_resolution_clock::now() - start;
+        auto latency = std::chrono::duration_cast<std::chrono::microseconds>(elapsed);
+        std::cerr << tag << " " << latency.count() << std::endl;
+    }
+    return std::chrono::high_resolution_clock::now();
+}
 
 namespace derecho{
 namespace cascade{
@@ -695,25 +707,47 @@ derecho::rpc::QueryResults<const typename SubgroupType::ObjectType> ServiceClien
         uint32_t subgroup_index,
         uint32_t shard_index) {
     if (!is_external_client()) {
+        auto gstart = std::chrono::high_resolution_clock::now();
+        auto start = std::chrono::high_resolution_clock::now();
         std::lock_guard<std::mutex> lck(this->group_ptr_mutex);
+        start = print_time(key,start,"LOCK1");
         node_id_t node_id = pick_member_by_policy<SubgroupType>(subgroup_index,shard_index);
+        start = print_time(key,start,"PICK_MEMBER1");
         try {
             // do p2p get as a subgroup member
             auto& subgroup_handle = group_ptr->template get_subgroup<SubgroupType>(subgroup_index);
             if (static_cast<uint32_t>(group_ptr->template get_my_shard<SubgroupType>(subgroup_index)) == shard_index) {
                 node_id = group_ptr->get_my_id();
             }
-            return subgroup_handle.template p2p_send<RPC_NAME(get)>(node_id,key,version,stable,false);
+            start = print_time(key,start,"NODE_ID1");
+
+            auto ret = subgroup_handle.template
+p2p_send<RPC_NAME(get)>(node_id,key,version,stable,false);
+            start = print_time(key,start,"P2P_SEND1");
+            print_time(key,gstart,"GLOBAL1");
+            
+            return ret;
         } catch (derecho::invalid_subgroup_exception& ex) {
+            auto start = std::chrono::high_resolution_clock::now();
             auto& subgroup_handle = group_ptr->template get_nonmember_subgroup<SubgroupType>(subgroup_index);
-            return subgroup_handle.template p2p_send<RPC_NAME(get)>(node_id,key,version,stable,false);
+            auto ret = subgroup_handle.template p2p_send<RPC_NAME(get)>(node_id,key,version,stable,false);
+            print_time(key,start,"CATCH1");
+            return ret;
         }
     } else {
+        auto gstart = std::chrono::high_resolution_clock::now();
+        auto start = std::chrono::high_resolution_clock::now();
         std::lock_guard<std::mutex> lck(this->external_group_ptr_mutex);
+        start = print_time(key,start,"LOCK2");
+
         // call as an external client (ExternalClientCaller).
         auto& caller = external_group_ptr->template get_subgroup_caller<SubgroupType>(subgroup_index);
         node_id_t node_id = pick_member_by_policy<SubgroupType>(subgroup_index,shard_index);
-        return caller.template p2p_send<RPC_NAME(get)>(node_id,key,version,stable,false); 
+        start = print_time(key,start,"NODE_ID2");
+        auto ret = caller.template p2p_send<RPC_NAME(get)>(node_id,key,version,stable,false); 
+        print_time(key,start,"P2P_SEND2");
+        print_time(key,gstart,"GLOBAL2");
+        return ret;
     }
 }
 
