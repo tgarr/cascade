@@ -23,7 +23,7 @@ static std::chrono::high_resolution_clock::time_point print_time(auto
     if(key.find("/category/data/") == 0){
         auto elapsed = std::chrono::high_resolution_clock::now() - start;
         auto latency = std::chrono::duration_cast<std::chrono::microseconds>(elapsed);
-        std::cerr << tag << " " << latency.count() << " " << key << std::endl;
+        std::cerr << tag << " " << latency.count() << std::endl;
     }
     return std::chrono::high_resolution_clock::now();
 }
