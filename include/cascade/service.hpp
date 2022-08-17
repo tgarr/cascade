@@ -794,7 +794,8 @@ namespace cascade {
                 const persistent::version_t& version = CURRENT_VERSION,
                 bool stable = true,
                 uint32_t subgroup_index = 0,
-                uint32_t shard_index = 0);
+                uint32_t shard_index = 0,
+                long long int *time = nullptr);
         /**
          * "type_recursive_get" is a helper function for internal use only.
          * @param type_index        the index of the subgroup type in the CascadeTypes... list. and the FirstType,

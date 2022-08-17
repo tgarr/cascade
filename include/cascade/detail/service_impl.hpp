@@ -688,7 +688,8 @@ derecho::rpc::QueryResults<const typename SubgroupType::ObjectType> ServiceClien
         const persistent::version_t& version,
         bool stable,
         uint32_t subgroup_index,
-        uint32_t shard_index) {
+        uint32_t shard_index,
+        long long int *time) {
     if (!is_external_client()) {
         std::lock_guard<std::mutex> lck(this->group_ptr_mutex);
         node_id_t node_id = pick_member_by_policy<SubgroupType>(subgroup_index,shard_index);
@@ -698,7 +699,14 @@ derecho::rpc::QueryResults<const typename SubgroupType::ObjectType> ServiceClien
             if (static_cast<uint32_t>(group_ptr->template get_my_shard<SubgroupType>(subgroup_index)) == shard_index) {
                 node_id = group_ptr->get_my_id();
             }
-            return subgroup_handle.template p2p_send<RPC_NAME(get)>(node_id,key,version,stable,false);
+
+            auto start = std::chrono::high_resolution_clock::now();
+            auto ret = subgroup_handle.template p2p_send<RPC_NAME(get)>(node_id,key,version,stable,false);
+            auto elapsed = std::chrono::high_resolution_clock::now() - start;
+            auto latency = std::chrono::duration_cast<std::chrono::microseconds>(elapsed);
+            if(time != nullptr) *time = latency.count();
+
+            return ret;
         } catch (derecho::invalid_subgroup_exception& ex) {
             auto& subgroup_handle = group_ptr->template get_nonmember_subgroup<SubgroupType>(subgroup_index);
             return subgroup_handle.template p2p_send<RPC_NAME(get)>(node_id,key,version,stable,false);
