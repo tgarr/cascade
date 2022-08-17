@@ -816,7 +816,8 @@ namespace cascade {
                 const persistent::version_t& version,
                 bool stable,
                 uint32_t subgroup_index,
-                uint32_t shard_index);
+                uint32_t shard_index,
+                long long int *time = nullptr);
 
         template <typename KeyType, typename LastType>
         auto type_recursive_get(
@@ -825,7 +826,8 @@ namespace cascade {
                 const persistent::version_t& version,
                 bool stable,
                 uint32_t subgroup_index,
-                uint32_t shard_index);
+                uint32_t shard_index,
+                long long int *time = nullptr);
     public:
 
         /**
@@ -835,7 +837,8 @@ namespace cascade {
         auto get(
                 const KeyType& key,
                 const persistent::version_t& version = CURRENT_VERSION,
-                bool stable = true);
+                bool stable = true,
+                long long int *time = nullptr);
 
         /**
          * "multi_get" retrieve the object of a given key, this operation involves atomic broadcast

@@ -758,11 +758,12 @@ auto ServiceClient<CascadeTypes...>::type_recursive_get(
         const persistent::version_t& version,
         bool stable,
         uint32_t subgroup_index,
-        uint32_t shard_index) {
+        uint32_t shard_index,
+        long long *time) {
     if (type_index == 0) {
-        return this->template get<FirstType>(key,version,stable,subgroup_index,shard_index);
+        return this->template get<FirstType>(key,version,stable,subgroup_index,shard_index,time);
     } else {
-        return this->template type_recursive_get<KeyType,SecondType,RestTypes...>(type_index-1,key,version,stable,subgroup_index,shard_index);
+        return this->template type_recursive_get<KeyType,SecondType,RestTypes...>(type_index-1,key,version,stable,subgroup_index,shard_index,time);
     }
 }
 
@@ -774,9 +775,10 @@ auto ServiceClient<CascadeTypes...>::type_recursive_get(
         const persistent::version_t& version,
         bool stable,
         uint32_t subgroup_index,
-        uint32_t shard_index) {
+        uint32_t shard_index,
+        long long *time) {
     if (type_index == 0) {
-        return this->template get<LastType>(key,version,stable,subgroup_index,shard_index);
+        return this->template get<LastType>(key,version,stable,subgroup_index,shard_index,time);
     } else {
         throw derecho::derecho_exception(std::string(__PRETTY_FUNCTION__) + ": type index is out of boundary.");
     }
@@ -788,7 +790,8 @@ auto ServiceClient<CascadeTypes...>::get(
         // const std::decay_t<typename std::result_of_t<decltype(&ObjectType::get_key_ref())>>& key,
         const KeyType& key,
         const persistent::version_t& version,
-        bool stable) {
+        bool stable,
+        long long int *time) {
     // STEP 1 - get key
     if constexpr (!std::is_convertible_v<KeyType,std::string>) {
         throw derecho::derecho_exception(__PRETTY_FUNCTION__ + std::string(" only supports string key,but we get ") + typeid(KeyType).name());
@@ -799,7 +802,7 @@ auto ServiceClient<CascadeTypes...>::get(
     std::tie(subgroup_type_index,subgroup_index,shard_index) = this->template key_to_shard(key);
 
     // STEP 3 - call recursive get
-    return this->template type_recursive_get<KeyType,CascadeTypes...>(subgroup_type_index,key,version,stable,subgroup_index,shard_index);
+    return this->template type_recursive_get<KeyType,CascadeTypes...>(subgroup_type_index,key,version,stable,subgroup_index,shard_index,time);
 }
 
 template <typename... CascadeTypes>
