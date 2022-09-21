@@ -89,6 +89,9 @@ if (ENABLE_EVALUATION)
     find_package(rpclib 2.3.0 REQUIRED)
 endif()
 
+# CacheLib
+find_package(cachelib CONFIG REQUIRED)
+
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/include/cascade/config.h)
 
 add_subdirectory(src/core)
@@ -109,7 +112,8 @@ target_link_libraries(cascade
     derecho::derecho
     spdlog::spdlog
     ${mutils_LIBRARIES}
-    OpenSSL::Crypto)
+    OpenSSL::Crypto
+    cachelib)
 set_target_properties(cascade PROPERTIES
     SOVERSION ${cascade_VERSION}
     VERSION ${cascade_build_VERSION}

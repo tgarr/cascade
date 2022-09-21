@@ -23,6 +23,7 @@
 #include "user_defined_logic_manager.hpp"
 #include "data_flow_graph.hpp"
 #include "detail/prefix_registry.hpp"
+#include "cache.hpp"
 
 /**
  * The cascade service templates
@@ -1676,6 +1677,20 @@ namespace cascade {
          * Destructor
          */
         virtual ~CascadeContext();
+
+    private:
+        /**
+         * Cascade cache infrastructure
+         */
+        std::unique_ptr<CascadeCache> cache;
+    
+    public:
+        /**
+         * get the reference to the cache infrastructure.
+         *
+         * @return a reference to the cache.
+         */
+        CascadeCache& get_cache_ref() const;
     };
 } // cascade
 } // derecho

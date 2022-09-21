@@ -1906,6 +1906,8 @@ template <typename... CascadeTypes>
 void CascadeContext<CascadeTypes...>::construct(derecho::Group<CascadeMetadataService<CascadeTypes...>,CascadeTypes...>* group_ptr) {
     // 1 - prepare the service client
     service_client = std::make_unique<ServiceClient<CascadeTypes...>>(group_ptr);
+    // 1.1 - prepare cache
+    cache = std::make_unique<CascadeCache>();
     // 2 - create data path logic loader and register the prefixes. Ideally, this part should be done in the control
     // plane, where a centralized controller should issue the control messages to do load/unload.
     // TODO: implement the control plane.
@@ -2159,6 +2161,7 @@ void CascadeContext<CascadeTypes...>::destroy() {
     stateful_workhorses_for_multicast.clear();
     stateful_workhorses_for_p2p.clear();
 #endif//HAS_STATEFUL_UDL_SUPPORT
+    cache.reset();
     dbg_default_trace("Cascade context@{:p} is destroyed.",static_cast<void*>(this));
 }
 
@@ -2299,6 +2302,9 @@ CascadeContext<CascadeTypes...>::~CascadeContext() {
     destroy();
 }
 
+CascadeCache& CascadeContext<CascadeTypes...>::get_cache_ref() const {
+    return *cache.get();
+}
 
 }
 }
