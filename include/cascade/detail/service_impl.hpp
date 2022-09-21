@@ -2302,6 +2302,7 @@ CascadeContext<CascadeTypes...>::~CascadeContext() {
     destroy();
 }
 
+template <typename... CascadeTypes>
 CascadeCache& CascadeContext<CascadeTypes...>::get_cache_ref() const {
     return *cache.get();
 }
