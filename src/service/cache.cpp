@@ -32,7 +32,7 @@ namespace cascade {
     }
 
     std::tuple<const void*,size_t> CascadeHostCache::get(std::string key){
-        auto handle = cache->find(key);
+        auto handle = cache->findFast(key); // only RAM, not NVM
         if(!handle){
             return std::make_tuple(CASCADE_CACHE_MISS,0);
         }
@@ -53,7 +53,7 @@ namespace cascade {
     }
 
     bool CascadeHostCache::is_cached(std::string key){
-        auto handle = cache->find(key);
+        auto handle = cache->peek(key);
         if(!handle) return false;
         return true;
     }
@@ -170,6 +170,7 @@ namespace cascade {
             
                 found = host_cache->is_cached(cache_key);
                 if(!found){
+                    // TODO use ItemDestructor for this
                     version_set.erase(version);
                     if(version_set.empty()){
                         version_location_map.erase(key);
