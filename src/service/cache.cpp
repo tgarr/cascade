@@ -62,7 +62,7 @@ namespace cascade {
         version_location_map.clear();
     }
 
-    void CascadeCache::put(const PlaceHolderObject &obj,int location){
+    void CascadeCache::put(const ObjectWithStringKey &obj,int location){
         // TODO location: put in the right location. Furthermore, if the new
         // location is different from thw location of previously cached
         // versions, cache the new one in the new location and remove the rest
@@ -96,7 +96,7 @@ namespace cascade {
                 cache_key += "::" + std::to_string(obj.version);
             }
 
-            if(host_cache->put(cache_key,obj.data,obj.size)){
+            if(host_cache->put(cache_key,obj.blob.bytes,obj.size)){
                 map_mtx.lock();
 
                 if(version_location_map.count(obj.key) == 0){
@@ -112,8 +112,8 @@ namespace cascade {
         }
     }
 
-    const PlaceHolderObject CascadeCache::get(std::string key,persistent::version_t version){
-        PlaceHolderObject obj;
+    const ObjectWithStringKey CascadeCache::get(std::string key,persistent::version_t version){
+        ObjectWithStringKey obj;
         obj.key = key;
         persistent::version_t version_found;
         int location; // TODO
@@ -127,16 +127,13 @@ namespace cascade {
             auto ret = host_cache->get(cache_key);
             if(std::get<0>(ret) != CASCADE_CACHE_MISS){
                 obj.version = version_found;
-                obj.data = std::get<0>(ret);
-                obj.size = std::get<1>(ret);
-
+                obj.blob = Blob(reinterpret_cast<const uint8_t*>(std::get<0>(ret)),std::get<1>(ret));
                 return obj;
             }
         }
         
         obj.version = CURRENT_VERSION;
-        obj.data = CASCADE_CACHE_MISS;
-        obj.size = 0;
+        obj.blob = Blob(CASCADE_CACHE_MISS,0);
 
         return obj;
     }
