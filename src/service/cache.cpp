@@ -96,7 +96,7 @@ namespace cascade {
                 cache_key += "::" + std::to_string(obj.version);
             }
 
-            if(host_cache->put(cache_key,obj.blob.bytes,obj.size)){
+            if(host_cache->put(cache_key,obj.blob.bytes,obj.blob.size)){
                 map_mtx.lock();
 
                 if(version_location_map.count(obj.key) == 0){
