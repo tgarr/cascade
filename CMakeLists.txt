@@ -112,7 +112,8 @@ target_link_libraries(cascade
     derecho::derecho
     spdlog::spdlog
     ${mutils_LIBRARIES}
-    OpenSSL::Crypto)
+    OpenSSL::Crypto
+    cachelib)
 set_target_properties(cascade PROPERTIES
     SOVERSION ${cascade_VERSION}
     VERSION ${cascade_build_VERSION}

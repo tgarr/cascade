@@ -88,5 +88,3 @@ namespace cascade {
 } // cascade
 } // derecho
 
-#include "detail/cache_impl.cpp"
-

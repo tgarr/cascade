@@ -1,5 +1,6 @@
 
 #include <algorithm>
+#include "cascade/cache.hpp"
 
 namespace derecho {
 namespace cascade {
