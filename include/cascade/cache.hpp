@@ -25,8 +25,10 @@ using CacheLibReadHandle = typename CacheLibType::ReadHandle;
 // return values
 #define CASCADE_CACHE_MISS nullptr
 
-// TODO get values from config file
-#define CACHELIB_SIZE 1024 * 1024 * 1024 * 1 // 1 GB
+// configuration
+#define CASCADE_HOST_CACHE_SIZE_CONF "CASCADE/max_host_cache_size"
+#define CASCADE_HOST_CACHE_DEFAULT_SIZE (1024 * 1024 * 1024 * 1) // 1 GB
+
 #define CACHELIB_BUCKET_POWER 25
 #define CACHELIB_LOCK_POWER 10
 
@@ -41,7 +43,7 @@ namespace cascade {
 
         public:
 
-        CascadeHostCache(size_t,unsigned int,unsigned int);
+        CascadeHostCache();
         ~CascadeHostCache();
         std::tuple<const void*,size_t> get(std::string);
         bool put(std::string,const void*,size_t);

@@ -1,13 +1,22 @@
 
 #include <algorithm>
 #include "cascade/cache.hpp"
+#include <derecho/conf/conf.hpp>
 
 namespace derecho {
 namespace cascade {
 
     // CascadeHostCache methods
 
-    CascadeHostCache::CascadeHostCache(size_t size,unsigned int bucket_power,unsigned int lock_power){
+    CascadeHostCache::CascadeHostCache(){
+        uint32_t size = CASCADE_CACHE_DEFAULT_SIZE;
+        uint32_t bucket_power = CACHELIB_BUCKET_POWER;
+        uint32_t lock_power = CACHELIB_LOCK_POWER;
+
+        if(derecho::hasCustomizedConfKey(CASCADE_HOST_CACHE_SIZE_CONF)){
+            size = derecho::getConfUInt32(CASCADE_HOST_CACHE_SIZE_CONF);
+        }
+
         CacheLibConfig config;
         config
             .setCacheSize(size)
@@ -52,7 +61,7 @@ namespace cascade {
     // CascadeCache methods
 
     CascadeCache::CascadeCache(){
-        host_cache = std::make_unique<CascadeHostCache>(CACHELIB_SIZE,CACHELIB_BUCKET_POWER,CACHELIB_LOCK_POWER);
+        host_cache = std::make_unique<CascadeHostCache>();
         device_cache = std::make_unique<CascadeDeviceCache>();
     }
 
