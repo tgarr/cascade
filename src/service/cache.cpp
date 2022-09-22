@@ -9,7 +9,7 @@ namespace cascade {
     // CascadeHostCache methods
 
     CascadeHostCache::CascadeHostCache(){
-        uint32_t size = CASCADE_CACHE_DEFAULT_SIZE;
+        uint32_t size = CASCADE_HOST_CACHE_DEFAULT_SIZE;
         uint32_t bucket_power = CACHELIB_BUCKET_POWER;
         uint32_t lock_power = CACHELIB_LOCK_POWER;
 
