@@ -19,6 +19,7 @@
 #include <utility>
 #include <derecho/conf/conf.hpp>
 #include "cascade.hpp"
+#include "utils.hpp"
 #include "object_pool_metadata.hpp"
 #include "user_defined_logic_manager.hpp"
 #include "data_flow_graph.hpp"
@@ -43,9 +44,9 @@ namespace cascade {
     using Factory = std::function<std::unique_ptr<CascadeType>(persistent::PersistentRegistry*, subgroup_id_t subgroup_id, ICascadeContext*)>;
 
     /* Cascade Metadata Service type*/
-	template<typename...CascadeTypes>
-	using CascadeMetadataService = PersistentCascadeStore<
-    	std::remove_cv_t<std::remove_reference_t<decltype(std::declval<ObjectPoolMetadata<CascadeTypes...>>().get_key_ref())>>,
+    template<typename...CascadeTypes>
+    using CascadeMetadataService = PersistentCascadeStore<
+        std::remove_cv_t<std::remove_reference_t<decltype(std::declval<ObjectPoolMetadata<CascadeTypes...>>().get_key_ref())>>,
         ObjectPoolMetadata<CascadeTypes...>,
         &ObjectPoolMetadata<CascadeTypes...>::IK,
         &ObjectPoolMetadata<CascadeTypes...>::IV,
@@ -90,7 +91,7 @@ namespace cascade {
      *
      * !!! IMPORTANT NOTES ON "ACTION" DESIGN !!!
      * Action carries the key string, version, prefix handler (ocdpo_raw_ptr), and the object value so that the prefix
-     * handler have all the information to process in the worker thread. It is important to avoid unnecessary copies
+     * handler has all the information to process in the worker thread. It is important to avoid unnecessary copies
      * because the object value is big sometime (for example, a high resolution video clip). Currently, we copied the
      * value data into a new allocated memory buffer pointed by a unique pointer in the critical data path because the
      * value in critical data path is in Derecho's managed RDMA buffer, which will not last beyond the lifetime of the
@@ -111,7 +112,8 @@ namespace cascade {
      *
      */
 #define ACTION_BUFFER_ENTRY_SIZE    (256)
-#define ACTION_BUFFER_SIZE          (1024)
+#define ACTION_BUFFER_SIZE          (8192)
+// #define ACTION_BUFFER_SIZE          (1024)
     struct Action {
         node_id_t                       sender;
         std::string                     key_string;
@@ -197,10 +199,11 @@ namespace cascade {
      */
     template <typename... CascadeTypes>
     class Service {
-    public:
         /**
          * Constructor
          * The constructor will load the configuration, start the service thread.
+         * Constructor is hidden for singleton.
+         *
          * @param dsms deserialization managers
          * @param metadata_service_factory
          * @param factories: subgroup factories.
@@ -208,6 +211,12 @@ namespace cascade {
         Service(const std::vector<DeserializationContext*>& dsms,
                 derecho::cascade::Factory<CascadeMetadataService<CascadeTypes...>> metadata_service_factory,
                 derecho::cascade::Factory<CascadeTypes>... factories);
+
+    public:
+        /**
+         * The virtual Service destructor.
+         */
+        virtual ~Service();
         /**
          * The workhorse
          */
@@ -305,6 +314,7 @@ namespace cascade {
         Random,         // use a random member in the shard for each operations(put/remove/get/get_by_time).
         FixedRandom,    // use a random member and stick to that for the following operations.
         RoundRobin,     // use a member in round-robin order.
+        KeyHashing,     // use the key's hashing 
         UserSpecified,  // user specify which member to contact.
         InvalidPolicy = -1
     };
@@ -467,12 +477,14 @@ namespace cascade {
          * Pick a member by a given a policy.
          * @param subgroup_index
          * @param shard_index
-         * @param retry - if true, refresh the member_cache.
+         * @param key_for_hashing   - only for KeyHashing policy, ignored otherwise.
+         * @param retry             - if true, refresh the member_cache.
          */
-        template <typename SubgroupType>
+        template <typename SubgroupType, typename KeyTypeForHashing>
         node_id_t pick_member_by_policy(uint32_t subgroup_index,
-                                                 uint32_t shard_index,
-                                                 bool retry = false);
+                                        uint32_t shard_index,
+                                        const KeyTypeForHashing& key_for_hashing,
+                                        bool retry = false);
 
         /**
          * Refresh(or fill) a member cache entry.
@@ -502,6 +514,7 @@ namespace cascade {
     public:
         /**
          * The Constructor
+         * We prevent calling the constructor explicitely, because the ServiceClient is a singleton.
          * @param _group_ptr The caller can pass a pointer pointing to a derecho group object. If the pointer is
          *                   valid, the implementation will reply on the group object instead of creating an external
          *                   client to communicate with group members.
@@ -519,10 +532,11 @@ namespace cascade {
 
         /**
          * Derecho group helpers: They derive the API in derecho::ExternalClient.
-         * - get_my_id          return my local node id.
-         * - get_members        returns all members in the top-level Derecho group.
-         * - get_shard_members  returns the members in a shard specified by subgroup id(or subgroup type/index pair) and
-         *   shard index.
+         * - get_my_id                  return my local node id.
+         * - get_members                returns all members in the top-level Derecho group.
+         * - get_subgroup_members       returns a vector of vectors of node ids: [[node ids in shard 0],[node ids in shard 1],...]
+         * - get_shard_members          returns the members in a shard specified by subgroup id(or subgroup type/index pair) and
+         *                              shard index.
          * - get_number_of_subgroups    returns the number of subgroups of a given type
          * - get_number_of_shards       returns the number of shards of a given subgroup
          * During view change, the Client might experience failure if the member is gone. In such a case, the client needs
@@ -533,7 +547,29 @@ namespace cascade {
         std::vector<node_id_t> get_members() const;
 
         template <typename SubgroupType>
+        std::vector<std::vector<node_id_t>> get_subgroup_members(uint32_t subgroup_index) const;
+    protected:
+        template <typename FirstType,typename SecondType, typename...RestTypes>
+        std::vector<std::vector<node_id_t>> type_recursive_get_subgroup_members(uint32_t type_index, uint32_t subgroup_index) const;
+        template <typename LastType>
+        std::vector<std::vector<node_id_t>> type_recursive_get_subgroup_members(uint32_t type_index, uint32_t subgroup_index) const;
+    public:
+        std::vector<std::vector<node_id_t>> get_subgroup_members(const std::string& object_pool_pathname);
+
+        template <typename SubgroupType>
         std::vector<node_id_t> get_shard_members(uint32_t subgroup_index,uint32_t shard_index) const;
+    protected:
+        template <typename FirstType,typename SecondType, typename...RestTypes>
+        std::vector<node_id_t> type_recursive_get_shard_members(uint32_t type_index,
+                uint32_t subgroup_index, uint32_t shard_index) const;
+        template <typename LastType>
+        std::vector<node_id_t> type_recursive_get_shard_members(uint32_t type_index,
+                uint32_t subgroup_index, uint32_t shard_index) const;
+    public:
+        std::vector<node_id_t> get_shard_members(const std::string& object_pool_pathname,uint32_t shard_index);
+
+        template <typename SubgroupType>
+        uint32_t get_number_of_subgroups() const;
 
         template <typename SubgroupType>
         uint32_t get_number_of_shards(uint32_t subgroup_index) const;
@@ -551,6 +587,12 @@ namespace cascade {
          * @param subgroup_index        - the subgroup index in the given type.
          */
         uint32_t get_number_of_shards(uint32_t subgroup_type_index, uint32_t subgroup_index) const;
+
+        /**
+         * This get_number_of_shards(), pick subgroup using object pool pathname.
+         * @param object_pool_pathname  - the object pool name
+         */
+        uint32_t get_number_of_shards(const std::string& object_pool_pathname);
 
         /**
          * Member selection policy control API.
@@ -841,7 +883,6 @@ namespace cascade {
                 uint32_t subgroup_index,
                 uint32_t shard_index);
     public:
-
         /**
          * object pool version
          */
@@ -1389,13 +1430,13 @@ namespace cascade {
 
 #ifdef ENABLE_EVALUATION
         /**
-         * Dump the timestamp log entries into a file on each of the nodes in a subgroup.
+         * Dump the timestamp log entries into a file on each of the nodes in a shard.
          *
          * @param filename         - the output filename
          * @param subgroup_index   - the subgroup index
          * @param shard_index      - the shard index
          *
-         * @return a vector of query results.
+         * @return query results
          */
         template <typename SubgroupType>
         derecho::rpc::QueryResults<void> dump_timestamp(const std::string& filename, const uint32_t subgroup_index, const uint32_t shard_index);
@@ -1403,13 +1444,28 @@ namespace cascade {
         /**
          * The object store version:
          *
-         * @param filename             -   the filename version
-         * @param object_pool_pathname -   the object pool version
+         * @param filename             -   the filename
+         * @param object_pool_pathname -   the object pool pathname
+         */
+        void dump_timestamp(const std::string& filename, const std::string& object_pool_pathname);
+
+        /**
+         * Dump the timestamp log entries into a file on each of the nodes in a subgroup.
          *
-         * @return query results
+         * @param filename         - the output filename
+         * @param subgroup_index   - the subgroup index
          */
         template <typename SubgroupType>
-        std::vector<std::unique_ptr<derecho::rpc::QueryResults<void>>> dump_timestamp(const std::string& filename, const std::string& object_pool_pathname);
+        void dump_timestamp(const uint32_t subgroup_index, const std::string& filename);
+
+    protected:
+        template <typename FirstType, typename SecondType, typename... RestTypes>
+        void type_recursive_dump(uint32_t type_index, uint32_t subgroup_index, const std::string& filename);
+        
+        template <typename LastType>
+        void type_recursive_dump(uint32_t type_index, uint32_t subgroup_index, const std::string& filename);
+
+    public:
 #ifdef DUMP_TIMESTAMP_WORKAROUND
         /**
          * Dump the timestamp log entries into a file on a specific node.
@@ -1449,7 +1505,26 @@ namespace cascade {
          */
         template <typename SubgroupType>
         inline static uint32_t get_subgroup_type_index();
-    };
+
+        /* singleton */
+    private:
+        static std::unique_ptr<ServiceClient> service_client_singleton_ptr;
+        static std::mutex                     singleton_mutex;
+    public:
+        /**
+         * Initialize the service_client_single_ptr singleton with a cascade service. This can only be called once
+         * before any get_service_client() is called.
+         * @param _group_ptr The caller can pass a pointer pointing to a derecho group object. If the pointer is
+         *                   valid, the implementation will reply on the group object instead of creating an external
+         *                   client to communicate with group members.
+         */
+        static void initialize(derecho::Group<CascadeMetadataService<CascadeTypes...>, CascadeTypes...>* _group_ptr);
+
+        /**
+         * Get the singleton ServiceClient API. If it does not exists, initialize it as an external client.
+         */
+        static ServiceClient& get_service_client();
+    }; // ServiceClient
 
 
     /**
@@ -1498,7 +1573,7 @@ namespace cascade {
                     std::tuple<
                         DataFlowGraph::VertexShardDispatcher,         // shard dispatcher
 #ifdef HAS_STATEFUL_UDL_SUPPORT
-                        bool,                                         // is stateful or not
+                        DataFlowGraph::Statefulness,                  // is stateful/stateless/singlethreaded
 #endif//HAS_STATEFUL_UDL_SUPPORT
                         DataFlowGraph::VertexHook,                    // hook
                         std::shared_ptr<OffCriticalDataPathObserver>, // ocdpo
@@ -1526,6 +1601,8 @@ namespace cascade {
 #ifdef HAS_STATEFUL_UDL_SUPPORT
         std::vector<std::unique_ptr<struct action_queue>> stateful_action_queues_for_multicast;
         std::vector<std::unique_ptr<struct action_queue>> stateful_action_queues_for_p2p;
+        struct action_queue single_threaded_action_queue_for_multicast;
+        struct action_queue single_threaded_action_queue_for_p2p;
 #endif//HAS_STATEFUL_UDL_SUPPORT
         struct action_queue stateless_action_queue_for_multicast;
         struct action_queue stateless_action_queue_for_p2p;
@@ -1544,9 +1621,9 @@ namespace cascade {
 #ifdef HAS_STATEFUL_UDL_SUPPORT
         std::vector<std::thread> stateful_workhorses_for_multicast;
         std::vector<std::thread> stateful_workhorses_for_p2p;
+        std::thread              single_threaded_workhorse_for_multicast;
+        std::thread              single_threaded_workhorse_for_p2p;
 #endif//HAS_STATEFUL_UDL_SUPPORT
-        /** the service client: off critical data path logic use it to send data to a next tier. */
-        std::unique_ptr<ServiceClient<CascadeTypes...>> service_client;
         /**
          * destroy the context, to be called in destructor
          */
@@ -1571,12 +1648,12 @@ namespace cascade {
          * global/static variables: CascadeContext relies on the global configuration from derecho implementation, which is
          * generally initialized with commandline parameters in main(). If we initialize the CascadeContext singleton in its
          * constructor, which happens before main(), it might miss extra configuration from commandline. Therefore,
-         * CascadeContext singleton needs to be initialized in main() by calling CascadeContext::initialize(). Moreover, it
+         * CascadeContext singleton needs to be initialized in main() by calling CascadeContext::construct(). Moreover, it
          * needs the off critical data path handler from main();
          *
          * @param group_ptr                         The group handle
          */
-        void construct(derecho::Group<CascadeMetadataService<CascadeTypes...>, CascadeTypes...>* group_ptr);
+        void construct();
         /**
          * get the reference to encapsulated service client handle.
          * The reference is valid only after construct() is called.
@@ -1640,7 +1717,7 @@ namespace cascade {
         virtual void register_prefixes(const std::unordered_set<std::string>& prefixes,
                                        const DataFlowGraph::VertexShardDispatcher shard_dispatcher,
 #ifdef HAS_STATEFUL_UDL_SUPPORT
-                                       const bool stateful,
+                                       const DataFlowGraph::Statefulness stateful,
 #endif
                                        const DataFlowGraph::VertexHook hook,
                                        const std::string& user_defined_logic_id,
@@ -1667,14 +1744,14 @@ namespace cascade {
          * post an action to the Context for processing.
          *
          * @param action        The action
-         * @param is_stateful   If the action is stateful or not
+         * @param stateful      If the action is stateful|stateless|singlethreaded
          * @param is_trigger    True for trigger, meaning the action will be processed in the workhorses for p2p send
          *
          * @return  true for a successful post, false for failure. The current only reason for failure is to post to a
          *          context already shut down.
          */
 #ifdef HAS_STATEFUL_UDL_SUPPORT
-        virtual bool post(Action&& action, bool is_stateful, bool is_trigger);
+        virtual bool post(Action&& action, DataFlowGraph::Statefulness stateful, bool is_trigger);
 #else
         virtual bool post(Action&& action, bool is_trigger);
 #endif//HAS_STATEFUL_UDL_SUPPORT
@@ -1691,7 +1768,7 @@ namespace cascade {
          * Destructor
          */
         virtual ~CascadeContext();
-    };
+    };//CascadeContext
 } // cascade
 } // derecho
 

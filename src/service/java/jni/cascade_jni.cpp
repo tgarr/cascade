@@ -1,3 +1,4 @@
+#include <cascade/config.h>
 #include <cascade/object.hpp>
 #include <cascade/service_client_api.hpp>
 #include <memory>
@@ -55,7 +56,7 @@ typedef enum {
 JNIEXPORT jlong JNICALL Java_io_cascade_Client_createClient(JNIEnv *env, jobject obj)
 {
     // create the service client API
-    derecho::cascade::ServiceClientAPI *capi = new derecho::cascade::ServiceClientAPI();
+    derecho::cascade::ServiceClientAPI *capi = &derecho::cascade::ServiceClientAPI::get_service_client();
     // send the memory address back as a handle
     return reinterpret_cast<jlong>(capi);
 }
