@@ -617,7 +617,7 @@ namespace cascade {
          *
          * @param function          user defined function that maps an object key (string) to an affinity set (string)
          */
-        void set_affinity_set_logic(const std::function<const std::string(const std::string &)> function);
+        void set_affinity_set_logic(const std::function<const std::string(const std::string &)>& function);
     
         /**
          * "put" writes an object to a given subgroup/shard.

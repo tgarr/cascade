@@ -10,6 +10,7 @@ class bcolors:
     FAIL = '\033[91m' #RED
     RESET = '\033[0m' #RESET COLOR
 
+
 class CascadeClientShell(cmd.Cmd):
     '''
     Cascade Client Shell
@@ -754,6 +755,16 @@ class CascadeClientShell(cmd.Cmd):
         else:
             print(bcolors.FAIL + f"Unknown timestamp_logger command: {cmd}." + bcolors.RESET)
 
+    def do_fix_shard(self, arg):
+        '''
+        fix_shard
+        =========
+        use fix shard to test set_affinity_set_logic
+        '''
+        self.check_capi()
+        def my_fix(_in_key):
+            return "__fix__"
+        self.capi.set_affinity_set_logic(my_fix)
     # end of CascadeClientShell definition
 
 if __name__ == '__main__':

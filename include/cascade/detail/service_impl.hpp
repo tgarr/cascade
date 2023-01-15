@@ -362,7 +362,7 @@ std::tuple<ShardMemberSelectionPolicy,node_id_t> ServiceClient<CascadeTypes...>:
 }
 
 template <typename... CascadeTypes>
-void ServiceClient<CascadeTypes...>::set_affinity_set_logic(const std::function<const std::string(const std::string &)> function){
+void ServiceClient<CascadeTypes...>::set_affinity_set_logic(const std::function<const std::string(const std::string &)>& function){
     this->affinity_set_logic = function;
 }
 

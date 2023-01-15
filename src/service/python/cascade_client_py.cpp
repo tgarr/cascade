@@ -4,6 +4,7 @@
 
 #include <cascade/cascade.hpp>
 #include <cascade/service_client_api.hpp>
+#include <pybind11/functional.h>
 #include <derecho/core/detail/rpc_utils.hpp>
 #include <derecho/persistent/PersistentInterface.hpp>
 #include <pybind11/pybind11.h>
@@ -1073,11 +1074,20 @@ PYBIND11_MODULE(member_client, m) {
             .def(
                     "get_object_pool",
                     [](ServiceClientAPI_PythonWrapper& capi, const std::string& object_pool_pathname) {
+                        std::cout << "Calling Python get_object_pool." << std::endl;
                         return get_object_pool(capi.ref, object_pool_pathname);
                     },
                     "Get an object pool by pathname. \n"
                     "\t@arg0    object pool pathname \n"
-                    "\t@return  object pool details.");
+                    "\t@return  object pool details.")
+            .def(
+                    "set_affinity_set_logic",
+                    [](ServiceClientAPI_PythonWrapper& capi,
+                        const std::function<const std::string(const std::string &)>& func) {
+                        capi.ref.set_affinity_set_logic(func);
+                    },
+                    "Set the affinity set function lambda. \n"
+                    "\t@arg0    a (string->string) function \n");
 
     py::class_<QueryResultsStore<std::tuple<persistent::version_t, uint64_t>, std::vector<long>>>(m, "QueryResultsStoreVerTmeStmp")
             .def(
